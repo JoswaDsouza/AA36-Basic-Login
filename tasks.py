@@ -1,42 +1,48 @@
+import pretty_errors
+import os
+import sys
+
 from robocorp import browser
 from robocorp.tasks import task
 
-from RPA.Excel.Files import Files as Excel
-from RPA.HTTP import HTTP
+pretty_errors.activate()
+username = "user@automationanywhere.com"
+password = "Automation123"
+challenge_url = "https://developer.automationanywhere.com/challenges/AutomationAnywhereLabs-Login.html"
 
+try:
+    @task
+    def solve_challenge():
+        """Configure browser"""
+        browser.configure(
+            browser_engine="chromium",
+            screenshot="only-on-failure",
+            headless=False,
+        )
+        """Navigate to the page"""
+        page = browser.goto(challenge_url)
+        page.wait_for_load_state(state='domcontentloaded')
 
-@task
-def solve_challenge():
-    """Solve the RPA challenge"""
-    browser.configure(
-        browser_engine="chromium",
-        screenshot="only-on-failure",
-        headless=True,
-    )
+        """Accept cookies"""
+        page.wait_for_selector(selector="//*[@id='onetrust-accept-btn-handler']")
+        page.click(selector="//*[@id='onetrust-accept-btn-handler']")
 
-    HTTP().download("https://rpachallenge.com/assets/downloadFiles/challenge.xlsx")
+        """Enter credentials"""
+        page.fill(selector="//*[@id='inputEmail']", value=username)
+        page.fill(selector="//*[@id='inputPassword']", value=password)
+        page.click("button:text('Sign in')")
 
-    excel = Excel()
-    excel.open_workbook("challenge.xlsx")
-    rows = excel.read_worksheet_as_table("Sheet1", header=True)
+        """Wait for result and take screenshot"""
+        page.wait_for_selector("//div[contains(@class, 'modal-content')]", state='visible')
+        page.screenshot(path=os.getcwd() + "\\result.png")
 
-    page = browser.goto("https://rpachallenge.com/")
-    page.click("button:text('Start')")
+        """End the process"""
+        page.close()
+        sys.exit()
 
-    for row in rows:
-        fill_and_submit_form(row)
+except Exception as e:
+    print("Exception: ", e)
+    sys.exit()
 
-    element = page.locator("css=div.congratulations")
-    browser.screenshot(element)
-
-
-def fill_and_submit_form(row):
-    page = browser.page()
-    page.fill("//input[@ng-reflect-name='labelFirstName']", str(row["First Name"]))
-    page.fill("//input[@ng-reflect-name='labelLastName']", str(row["Last Name"]))
-    page.fill("//input[@ng-reflect-name='labelCompanyName']", str(row["Company Name"]))
-    page.fill("//input[@ng-reflect-name='labelRole']", str(row["Role in Company"]))
-    page.fill("//input[@ng-reflect-name='labelAddress']", str(row["Address"]))
-    page.fill("//input[@ng-reflect-name='labelEmail']", str(row["Email"]))
-    page.fill("//input[@ng-reflect-name='labelPhone']", str(row["Phone Number"]))
-    page.click("input:text('Submit')")
+if __name__ == '__main__':
+    solve_challenge()
